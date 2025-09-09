@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBudget - High School Budget Management System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .auth-section {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard {
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .budget-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .budget-item:last-child {
+            border-bottom: none;
+        }
+        
+        .amount {
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .amount.negative {
+            color: #dc3545;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .metric-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .department-selector {
+            margin-bottom: 20px;
+        }
+        
+        select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .admin-only {
+            display: none;
+        }
+        
+        .role-badge {
+            background: #28a745;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        
+        .role-badge.admin {
+            background: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎓 EduBudget</div>
+            <div class="user-info">
+                <div id="user-display" style="display: none;">
+                    <span id="user-email"></span>
+                    <span id="user-role" class="role-badge"></span>
+                    <button class="btn btn-danger" onclick="logout()">Logout</button>
+                </div>
+                <div id="login-display">
+                    <button class="btn btn-primary" onclick="showLogin()">Login with SSO</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="auth-section" class="auth-section">
+            <h2>Welcome to EduBudget</h2>
+            <p>High School Budget Management System</p>
+            <br>
+            <p>Please login to access the budget management dashboard.</p>
+            <br>
+            <button class="btn btn-primary" onclick="showLogin()">Login with SSO</button>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" class="dashboard">
+            <!-- Metrics Overview -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h3>📊 Budget Overview</h3>
+                <div class="metrics">
+                    <div class="metric-card">
+                        <div class="metric-value" id="total-budget">$0</div>
+                        <div class="metric-label">Total Budget</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="allocated-budget">$0</div>
+                        <div class="metric-label">Allocated</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="remaining-budget">$0</div>
+                        <div class="metric-label">Remaining</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="cost-per-student">$0</div>
+                        <div class="metric-label">Cost per Student</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Department Selection -->
+            <div class="card admin-only">
+                <h3>🏢 Department Management</h3>
+                <div class="department-selector">
+                    <label for="department-select">Select Department:</label>
+                    <select id="department-select" onchange="loadDepartmentData()">
+                        <option value="all">All Departments</option>
+                        <option value="mathematics">Mathematics</option>
+                        <option value="science">Science</option>
+                        <option value="english">English</option>
+                        <option value="history">History</option>
+                        <option value="arts">Arts</option>
+                        <option value="sports">Sports</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Budget Allocations -->
+            <div class="card">
+                <h3>💰 Budget Allocations</h3>
+                <div id="budget-allocations">
+                    <!-- Dynamic content will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Resource Utilization -->
+            <div class="card">
+                <h3>📈 Resource Utilization</h3>
+                <div id="resource-utilization">
+                    <!-- Dynamic content will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Instructor Costs -->
+            <div class="card">
+                <h3>👨‍🏫 Instructor Costs</h3>
+                <div id="instructor-costs">
+                    <!-- Dynamic content will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Facility Management -->
+            <div class="card">
+                <h3>🏫 Facility Management</h3>
+                <div id="facility-management">
+                    <!-- Dynamic content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SSO Widget Modal -->
+    <div id="sso-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+            <iframe src="http://localhost:2080/sso-widget.html" width="450" height="600" frameborder="0"></iframe>
+            <button onclick="hideLogin()" style="position: absolute; top: 10px; right: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer;">✕</button>
+        </div>
+    </div>
+
+    <script>
+        // SSO Configuration
+        const ssoConfig = {
+            apiUrl: 'http://localhost:2080/api/v1/sso-service',
+            clientId: 'edubudget_client_789',
+            clientSecret: 'edubudget_secret_123'
+        };
+
+        // Sample budget data
+        const budgetData = {
+            all: {
+                totalBudget: 2500000,
+                departments: {
+                    mathematics: { allocated: 400000, students: 850, instructors: 12, facilities: 8 },
+                    science: { allocated: 600000, students: 750, instructors: 15, facilities: 12 },
+                    english: { allocated: 350000, students: 900, instructors: 18, facilities: 6 },
+                    history: { allocated: 300000, students: 600, instructors: 10, facilities: 4 },
+                    arts: { allocated: 450000, students: 400, instructors: 8, facilities: 10 },
+                    sports: { allocated: 400000, students: 500, instructors: 6, facilities: 15 }
+                }
+            }
+        };
+
+        let currentUser = null;
+        let currentDepartment = 'all';
+
+        // Authentication functions
+        function showLogin() {
+            document.getElementById('sso-modal').style.display = 'block';
+        }
+
+        function hideLogin() {
+            document.getElementById('sso-modal').style.display = 'none';
+        }
+
+        async function checkAuthentication() {
+            const token = localStorage.getItem('sso_access_token');
+            if (!token || isTokenExpired()) {
+                showAuthSection();
+                return false;
+            }
+
+            try {
+                const response = await fetch(`${ssoConfig.apiUrl}/auth/verify`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    currentUser = userData;
+                    showDashboard();
+                    return true;
+                } else {
+                    clearTokens();
+                    showAuthSection();
+                    return false;
+                }
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                showAuthSection();
+                return false;
+            }
+        }
+
+        function isTokenExpired() {
+            const expiry = localStorage.getItem('sso_token_expiry');
+            return !expiry || Date.now() > parseInt(expiry);
+        }
+
+        function clearTokens() {
+            localStorage.removeItem('sso_access_token');
+            localStorage.removeItem('sso_refresh_token');
+            localStorage.removeItem('sso_token_expiry');
+        }
+
+        function showAuthSection() {
+            document.getElementById('auth-section').style.display = 'block';
+            document.getElementById('dashboard').style.display = 'none';
+            document.getElementById('user-display').style.display = 'none';
+            document.getElementById('login-display').style.display = 'block';
+        }
+
+        function showDashboard() {
+            document.getElementById('auth-section').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'grid';
+            document.getElementById('user-display').style.display = 'flex';
+            document.getElementById('login-display').style.display = 'none';
+
+            // Update user info
+            document.getElementById('user-email').textContent = currentUser.email;
+            const roleElement = document.getElementById('user-role');
+            const isAdmin = currentUser.roles.includes('ROLE_ADMIN');
+            
+            roleElement.textContent = isAdmin ? 'Admin' : 'User';
+            roleElement.className = `role-badge ${isAdmin ? 'admin' : ''}`;
+
+            // Show/hide admin sections
+            const adminSections = document.querySelectorAll('.admin-only');
+            adminSections.forEach(section => {
+                section.style.display = isAdmin ? 'block' : 'none';
+            });
+
+            loadDashboardData();
+        }
+
+        async function logout() {
+            try {
+                const refreshToken = localStorage.getItem('sso_refresh_token');
+                if (refreshToken) {
+                    await fetch(`${ssoConfig.apiUrl}/auth/logout`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            refreshToken,
+                            clientId: ssoConfig.clientId,
+                            clientSecret: ssoConfig.clientSecret
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+
+            clearTokens();
+            currentUser = null;
+            showAuthSection();
+        }
+
+        // Budget calculation functions
+        function calculateMetrics(department = 'all') {
+            const data = budgetData[department] || budgetData.all;
+            let totalAllocated = 0;
+            let totalStudents = 0;
+
+            if (department === 'all') {
+                Object.values(data.departments).forEach(dept => {
+                    totalAllocated += dept.allocated;
+                    totalStudents += dept.students;
+                });
+            } else {
+                const deptData = data.departments[department];
+                if (deptData) {
+                    totalAllocated = deptData.allocated;
+                    totalStudents = deptData.students;
+                }
+            }
+
+            const totalBudget = data.totalBudget;
+            const remaining = totalBudget - totalAllocated;
+            const costPerStudent = totalStudents > 0 ? totalAllocated / totalStudents : 0;
+
+            return {
+                totalBudget,
+                totalAllocated,
+                remaining,
+                costPerStudent,
+                totalStudents
+            };
+        }
+
+        function loadDashboardData() {
+            const metrics = calculateMetrics(currentDepartment);
+            
+            document.getElementById('total-budget').textContent = formatCurrency(metrics.totalBudget);
+            document.getElementById('allocated-budget').textContent = formatCurrency(metrics.totalAllocated);
+            document.getElementById('remaining-budget').textContent = formatCurrency(metrics.remaining);
+            document.getElementById('cost-per-student').textContent = formatCurrency(metrics.costPerStudent);
+
+            loadBudgetAllocations();
+            loadResourceUtilization();
+            loadInstructorCosts();
+            loadFacilityManagement();
+        }
+
+        function loadDepartmentData() {
+            currentDepartment = document.getElementById('department-select').value;
+            loadDashboardData();
+        }
+
+        function loadBudgetAllocations() {
+            const container = document.getElementById('budget-allocations');
+            const data = budgetData.all.departments;
+            
+            let html = '';
+            Object.entries(data).forEach(([dept, info]) => {
+                const utilizationRate = (info.allocated / budgetData.all.totalBudget * 100).toFixed(1);
+                html += `
+                    <div class="budget-item">
+                        <span>${dept.charAt(0).toUpperCase() + dept.slice(1)}</span>
+                        <div>
+                            <span class="amount">${formatCurrency(info.allocated)}</span>
+                            <small>(${utilizationRate}%)</small>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function loadResourceUtilization() {
+            const container = document.getElementById('resource-utilization');
+            const data = budgetData.all.departments;
+            
+            let html = '';
+            Object.entries(data).forEach(([dept, info]) => {
+                const studentFacilityRatio = (info.students / info.facilities).toFixed(1);
+                html += `
+                    <div class="budget-item">
+                        <span>${dept.charAt(0).toUpperCase() + dept.slice(1)}</span>
+                        <div>
+                            <span>${studentFacilityRatio} students/facility</span>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function loadInstructorCosts() {
+            const container = document.getElementById('instructor-costs');
+            const data = budgetData.all.departments;
+            const avgSalary = 65000; // Average instructor salary
+            
+            let html = '';
+            Object.entries(data).forEach(([dept, info]) => {
+                const totalInstructorCost = info.instructors * avgSalary;
+                const costPerStudent = (totalInstructorCost / info.students).toFixed(0);
+                html += `
+                    <div class="budget-item">
+                        <span>${dept.charAt(0).toUpperCase() + dept.slice(1)} (${info.instructors} instructors)</span>
+                        <div>
+                            <span class="amount">${formatCurrency(totalInstructorCost)}</span>
+                            <small>(${formatCurrency(costPerStudent)}/student)</small>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function loadFacilityManagement() {
+            const container = document.getElementById('facility-management');
+            const data = budgetData.all.departments;
+            const facilityMaintenanceCost = 15000; // Annual maintenance per facility
+            
+            let html = '';
+            Object.entries(data).forEach(([dept, info]) => {
+                const totalFacilityCost = info.facilities * facilityMaintenanceCost;
+                const utilizationRate = ((info.students / (info.facilities * 30)) * 100).toFixed(1); // Assuming 30 capacity per facility
+                html += `
+                    <div class="budget-item">
+                        <span>${dept.charAt(0).toUpperCase() + dept.slice(1)} (${info.facilities} facilities)</span>
+                        <div>
+                            <span class="amount">${formatCurrency(totalFacilityCost)}</span>
+                            <small>(${utilizationRate}% utilization)</small>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Listen for SSO authentication success
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'sso-success') {
+                hideLogin();
+                checkAuthentication();
+            }
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuthentication();
+        });
+    </script>
+</body>
+</html>

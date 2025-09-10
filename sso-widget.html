@@ -925,16 +925,38 @@
                 document.getElementById('sso-title').textContent = 'Email Verification';
             }
 
-            defaultOnSuccess(data) {
-                this.showSuccess('Login successful! Redirecting to dashboard...');
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 1000);
+            // defaultOnSuccess(data) {
+            //     this.showSuccess('Login successful! Redirecting to dashboard...');
+            //     setTimeout(() => {
+            //         window.location.href = 'dashboard.html';
+            //     }, 1000);
                 
+            //     if (window.AppConfig?.isDebugMode()) {
+            //         console.log('Login successful:', data);
+            //     }
+            // }
+
+            defaultOnSuccess(data) {
+                this.showSuccess('Login successful! Redirecting...');
+                const user = data.user || {};
+                const roles = user.roles || [];
+
+                console.log('User roles---------------:', roles);
+
+                setTimeout(() => {
+                    if (roles.includes('ROLE_ADMIN')) {
+                        window.location.href = 'budget-dashboard.html';
+                    } else {
+                        window.location.href = 'dashboard.html';
+                    }
+                }, 1000);
+
                 if (window.AppConfig?.isDebugMode()) {
                     console.log('Login successful:', data);
                 }
             }
+
+
 
             defaultOnError(message) {
                 this.showError(message);
@@ -1243,8 +1265,27 @@
             
             ssoWidget = new SSOWidget({
                 demoMode: demoMode,
+                reloadOnLogin: true,
                 onSuccess: (data) => {
                     console.log('Authentication successful:', data);
+
+                    const user = data.user;
+                    if (user && user.roles) {
+                        if (
+                            user.roles.includes("ROLE_ADMIN") ||
+                            user.roles.includes("ROLE_DEAN") ||
+                            user.roles.includes("ROLE_DEPARTMENT_HEAD")
+                        ) {
+                            // Redirect privileged roles
+                            window.location.href = "budget-dashboard.html";
+                        } else {
+                            // Redirect normal users
+                            window.location.href = "dashboard.html";
+                        }
+                    } else {
+                        // Fallback if no roles exist
+                        window.location.href = "dashboard.html";
+                    }
                 },
                 onError: (error) => {
                     console.error('Authentication error:', error);

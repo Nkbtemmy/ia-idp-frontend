@@ -293,13 +293,6 @@
         </div>
     </div>
 
-    <!-- SSO Widget Modal -->
-    <div id="sso-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-            <iframe src="sso-widget.html" width="450" height="600" frameborder="0"></iframe>
-            <button onclick="hideLogin()" style="position: absolute; top: 10px; right: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer;">✕</button>
-        </div>
-    </div>
 
     <script src="config.js"></script>
     <script>
@@ -329,11 +322,12 @@
 
         // Authentication functions
         function showLogin() {
-            document.getElementById('sso-modal').style.display = 'block';
-        }
-
-        function hideLogin() {
-            document.getElementById('sso-modal').style.display = 'none';
+            // Direct redirect to SSO widget page
+            window.location.href = 'sso-widget.html';
+            
+            if (window.AppConfig?.isDebugMode()) {
+                console.log('Redirecting to SSO widget');
+            }
         }
 
         async function checkAuthentication() {
@@ -728,11 +722,11 @@
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
-            // First check if this is an OAuth callback
+            // Check for OAuth callback first
             if (!handleOAuthCallback()) {
-                // If not OAuth callback, do normal auth check
                 checkAuthentication();
             }
+            
             
             // Setup automatic token refresh
             setupTokenRefresh();

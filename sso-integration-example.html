@@ -76,13 +76,12 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
-        // SSO Configuration
+        // SSO Configuration - Using dynamic config
         const ssoConfig = {
-            apiUrl: 'http://localhost:2080/api/v1/sso-service',
-            clientId: 'demo_client_123', // This would be your registered client ID
-            clientSecret: 'demo_secret_456', // This would be your client secret
-            redirectUri: window.location.origin,
+            apiUrl: window.AppConfig.getApiUrl(),
+            redirectUri: window.AppConfig.getRedirectUri(),
             onSuccess: (data) => {
                 console.log('SSO Success:', data);
                 hideSSOWidget();
@@ -154,7 +153,7 @@
         }
 
         async function verifyToken(token) {
-            const response = await fetch(`${ssoConfig.apiUrl}/auth/verify`, {
+            const response = await fetch(`${window.AppConfig.getApiUrl()}/auth/verify`, {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -215,9 +214,43 @@
         document.getElementById('logout-btn').addEventListener('click', logout);
         document.getElementById('check-token-btn').addEventListener('click', updateAuthStatus);
 
+
+        // Handle LinkedIn OAuth callback
+        function handleOAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const accessToken = urlParams.get('access_token');
+            const refreshToken = urlParams.get('refresh_token');
+            const expiresIn = urlParams.get('expires_in');
+            const error = urlParams.get('error');
+            const errorDescription = urlParams.get('error_description');
+            
+            // Handle OAuth errors
+            if (error) {
+                console.error('OAuth Error:', error, errorDescription);
+                alert(`Authentication failed: ${errorDescription || error}`);
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return false;
+            }
+            
+            if (accessToken && refreshToken) {
+                localStorage.setItem('sso_access_token', accessToken);
+                localStorage.setItem('sso_refresh_token', refreshToken);
+                localStorage.setItem('sso_token_expiry', Date.now() + (parseInt(expiresIn || 3600) * 1000));
+                
+                window.history.replaceState({}, document.title, window.location.pathname);
+                updateAuthStatus();
+                showProtectedContent();
+                return true;
+            }
+            return false;
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
-            updateAuthStatus();
+            // Check for OAuth callback first
+            if (!handleOAuthCallback()) {
+                updateAuthStatus();
+            }
         });
 
         // Listen for messages from the SSO widget iframe

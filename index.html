@@ -174,6 +174,23 @@
         .role-badge.admin {
             background: #dc3545;
         }
+        
+        .verification-status {
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            margin-left: 5px;
+        }
+        
+        .verification-status.verified {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .verification-status.unverified {
+            background: #f8d7da;
+            color: #721c24;
+        }
     </style>
 </head>
 <body>
@@ -184,10 +201,8 @@
                 <div id="user-display" style="display: none;">
                     <span id="user-email"></span>
                     <span id="user-role" class="role-badge"></span>
+                    <span id="verification-status" class="verification-status"></span>
                     <button class="btn btn-danger" onclick="logout()">Logout</button>
-                </div>
-                <div id="login-display">
-                    <button class="btn btn-primary" onclick="showLogin()">Login with SSO</button>
                 </div>
             </div>
         </div>
@@ -281,17 +296,17 @@
     <!-- SSO Widget Modal -->
     <div id="sso-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
         <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-            <iframe src="http://localhost:2080/sso-widget.html" width="450" height="600" frameborder="0"></iframe>
+            <iframe src="sso-widget.html" width="450" height="600" frameborder="0"></iframe>
             <button onclick="hideLogin()" style="position: absolute; top: 10px; right: 10px; background: red; color: white; border: none; padding: 5px 10px; cursor: pointer;">✕</button>
         </div>
     </div>
 
+    <script src="config.js"></script>
     <script>
-        // SSO Configuration
+        // SSO Configuration - Using dynamic config
         const ssoConfig = {
-            apiUrl: 'http://localhost:2080/api/v1/sso-service',
-            clientId: 'edubudget_client_789',
-            clientSecret: 'edubudget_secret_123'
+            apiUrl: window.AppConfig.getApiUrl(),
+            redirectUri: window.AppConfig.getRedirectUri()
         };
 
         // Sample budget data
@@ -322,14 +337,27 @@
         }
 
         async function checkAuthentication() {
-            const token = localStorage.getItem('sso_access_token');
-            if (!token || isTokenExpired()) {
+            let token = localStorage.getItem('sso_access_token');
+            
+            if (!token) {
                 showAuthSection();
                 return false;
             }
 
+            // Try to refresh token if expired
+            if (isTokenExpired()) {
+                try {
+                    token = await refreshAccessToken();
+                } catch (error) {
+                    console.log('Token refresh failed:', error.message);
+                    clearTokens();
+                    showAuthSection();
+                    return false;
+                }
+            }
+
             try {
-                const response = await fetch(`${ssoConfig.apiUrl}/auth/verify`, {
+                const response = await fetch(`${window.AppConfig.getApiUrl()}/auth/verify`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -339,6 +367,37 @@
                     showDashboard();
                     return true;
                 } else {
+                    // If verification fails, try to refresh token once more
+                    if (response.status === 401) {
+                        try {
+                            token = await refreshAccessToken();
+                            const retryResponse = await fetch(`${window.AppConfig.getApiUrl()}/auth/verify`, {
+                                headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            
+                            if (retryResponse.ok) {
+                                const userData = await retryResponse.json();
+                                currentUser = userData;
+                                showDashboard();
+                                return true;
+                            } else {
+                                // Log backend error message
+                                const errorData = await retryResponse.json();
+                                console.log('Token verification failed:', errorData.message || errorData.error);
+                            }
+                        } catch (refreshError) {
+                            console.log('Token refresh retry failed:', refreshError.message);
+                        }
+                    } else {
+                        // Log backend error for non-401 errors
+                        try {
+                            const errorData = await response.json();
+                            console.log('Auth verification failed:', errorData.message || errorData.error);
+                        } catch (e) {
+                            console.log('Auth verification failed with status:', response.status);
+                        }
+                    }
+                    
                     clearTokens();
                     showAuthSection();
                     return false;
@@ -347,6 +406,42 @@
                 console.error('Auth check failed:', error);
                 showAuthSection();
                 return false;
+            }
+        }
+
+        async function refreshAccessToken() {
+            const refreshToken = localStorage.getItem('sso_refresh_token');
+            if (!refreshToken) {
+                throw new Error('No refresh token available');
+            }
+
+            try {
+                const response = await fetch(`${window.AppConfig.getApiUrl()}/auth/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        refreshToken
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store new tokens
+                    localStorage.setItem('sso_access_token', data.access_token);
+                    localStorage.setItem('sso_refresh_token', data.refresh_token);
+                    localStorage.setItem('sso_token_expiry', Date.now() + (data.expires_in * 1000));
+                    return data.access_token;
+                } else {
+                    // Use backend error message
+                    const errorMessage = data.message || data.error || `Token refresh failed (${response.status})`;
+                    throw new Error(errorMessage);
+                }
+            } catch (error) {
+                clearTokens();
+                throw error;
             }
         }
 
@@ -382,6 +477,12 @@
             roleElement.textContent = isAdmin ? 'Admin' : 'User';
             roleElement.className = `role-badge ${isAdmin ? 'admin' : ''}`;
 
+            // Update verification status
+            const verificationElement = document.getElementById('verification-status');
+            const isVerified = currentUser.verified || false;
+            verificationElement.textContent = isVerified ? '✓ Verified' : '⚠ Unverified';
+            verificationElement.className = `verification-status ${isVerified ? 'verified' : 'unverified'}`;
+
             // Show/hide admin sections
             const adminSections = document.querySelectorAll('.admin-only');
             adminSections.forEach(section => {
@@ -395,13 +496,11 @@
             try {
                 const refreshToken = localStorage.getItem('sso_refresh_token');
                 if (refreshToken) {
-                    await fetch(`${ssoConfig.apiUrl}/auth/logout`, {
+                    await fetch(`${window.AppConfig.getApiUrl()}/auth/logout`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            refreshToken,
-                            clientId: ssoConfig.clientId,
-                            clientSecret: ssoConfig.clientSecret
+                            refreshToken
                         })
                     });
                 }
@@ -569,9 +668,74 @@
             }
         });
 
+        // Set up automatic token refresh
+        function setupTokenRefresh() {
+            const checkInterval = 5 * 60 * 1000; // Check every 5 minutes
+            
+            setInterval(async () => {
+                const token = localStorage.getItem('sso_access_token');
+                if (token && currentUser) {
+                    const expiry = localStorage.getItem('sso_token_expiry');
+                    const timeUntilExpiry = parseInt(expiry) - Date.now();
+                    
+                    // Refresh token if it expires in the next 10 minutes
+                    if (timeUntilExpiry < 10 * 60 * 1000) {
+                        try {
+                            await refreshAccessToken();
+                            console.log('Token refreshed automatically');
+                        } catch (error) {
+                            console.log('Automatic token refresh failed:', error.message);
+                            // Don't logout automatically, let the user continue until next API call
+                        }
+                    }
+                }
+            }, checkInterval);
+        }
+
+        // Handle LinkedIn OAuth callback
+        function handleOAuthCallback() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const accessToken = urlParams.get('access_token');
+            const refreshToken = urlParams.get('refresh_token');
+            const expiresIn = urlParams.get('expires_in');
+            const error = urlParams.get('error');
+            const errorDescription = urlParams.get('error_description');
+            
+            // Handle OAuth errors
+            if (error) {
+                console.error('OAuth Error:', error, errorDescription);
+                alert(`Authentication failed: ${errorDescription || error}`);
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                return false;
+            }
+            
+            if (accessToken && refreshToken) {
+                // Store tokens from LinkedIn OAuth callback
+                localStorage.setItem('sso_access_token', accessToken);
+                localStorage.setItem('sso_refresh_token', refreshToken);
+                localStorage.setItem('sso_token_expiry', Date.now() + (parseInt(expiresIn || 3600) * 1000));
+                
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Check authentication and show dashboard
+                checkAuthentication();
+                return true;
+            }
+            return false;
+        }
+
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', () => {
-            checkAuthentication();
+            // First check if this is an OAuth callback
+            if (!handleOAuthCallback()) {
+                // If not OAuth callback, do normal auth check
+                checkAuthentication();
+            }
+            
+            // Setup automatic token refresh
+            setupTokenRefresh();
         });
     </script>
 </body>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Verification</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f9fc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .verify-container {
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .verify-btn {
+      background: #28a745;
+      border: none;
+      color: #fff;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 20px;
+      width: 100%;
+    }
+    .verify-btn:hover {
+      background: #218838;
+    }
+    .message {
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    .message.success {
+      color: #28a745;
+    }
+    .message.error {
+      color: #dc3545;
+    }
+  </style>
+</head>
+<body>
+  <div class="verify-container">
+    <h2>Email Verification</h2>
+    <p id="email-text">Click the button below to verify your email.</p>
+    <button id="verify-btn" class="verify-btn">Verify Email</button>
+    <div id="message" class="message"></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
+    // Extract token from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
+
+    const verifyBtn = document.getElementById("verify-btn");
+    const messageDiv = document.getElementById("message");
+
+    if (!token) {
+      verifyBtn.disabled = true;
+      messageDiv.textContent = "Invalid or missing verification token.";
+      messageDiv.className = "message error";
+    }
+
+    verifyBtn.addEventListener("click", async () => {
+      messageDiv.textContent = "";
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = "Verifying...";
+
+      try {
+        const response = await fetch(`${window.AppConfig.getApiUrl()}/auth/verify-email?token=${encodeURIComponent(token)}`, {
+          method: "GET"
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          // Display backend success message or fallback
+          const successMessage = data.message || "✅ Your email has been successfully verified!";
+          messageDiv.textContent = successMessage;
+          messageDiv.className = "message success";
+          verifyBtn.style.display = "none";
+        } else {
+          // Display backend error message
+          const errorMessage = data.message || data.error || `❌ Verification failed (${response.status}). Please try again.`;
+          messageDiv.textContent = errorMessage;
+          messageDiv.className = "message error";
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = "Verify Email";
+        }
+      } catch (error) {
+        messageDiv.textContent = "❌ Network error: " + error.message;
+        messageDiv.className = "message error";
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = "Verify Email";
+      }
+    });
+  </script>
+</body>
+</html>

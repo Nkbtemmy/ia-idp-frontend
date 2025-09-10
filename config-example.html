@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Configuration Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .config-display {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .environment {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .config-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        .override-section {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dynamic Configuration Demo</h1>
+    
+    <div class="config-display">
+        <h2>Current Configuration</h2>
+        <div class="environment">Environment: <span id="current-env"></span></div>
+        <div class="config-item">
+            <strong>API URL:</strong> <span id="api-url"></span>
+        </div>
+        <div class="config-item">
+            <strong>Base URL:</strong> <span id="base-url"></span>
+        </div>
+        <div class="config-item">
+            <strong>Debug Mode:</strong> <span id="debug-mode"></span>
+        </div>
+        <div class="config-item">
+            <strong>Redirect URI:</strong> <span id="redirect-uri"></span>
+        </div>
+    </div>
+
+    <div class="override-section">
+        <h3>Test Configuration Override</h3>
+        <p>You can temporarily override the configuration for testing:</p>
+        <div>
+            <input type="text" id="override-api" placeholder="Override API URL">
+            <button onclick="overrideApiUrl()">Override API URL</button>
+        </div>
+        <button onclick="resetConfig()">Reset to Default</button>
+    </div>
+
+    <div class="config-display">
+        <h3>Environment Detection Logic</h3>
+        <p><strong>Current hostname:</strong> <span id="hostname"></span></p>
+        <p><strong>Detection rules:</strong></p>
+        <ul>
+            <li><strong>Development:</strong> localhost, 127.0.0.1, or contains 'local'</li>
+            <li><strong>Staging:</strong> contains 'staging', 'dev', or 'test'</li>
+            <li><strong>Production:</strong> everything else</li>
+        </ul>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        function updateDisplay() {
+            document.getElementById('current-env').textContent = window.AppConfig.getEnvironment();
+            document.getElementById('api-url').textContent = window.AppConfig.getApiUrl();
+            document.getElementById('base-url').textContent = window.AppConfig.getBaseUrl();
+            document.getElementById('debug-mode').textContent = window.AppConfig.isDebugMode() ? 'Enabled' : 'Disabled';
+            document.getElementById('redirect-uri').textContent = window.AppConfig.getRedirectUri();
+            document.getElementById('hostname').textContent = window.location.hostname;
+        }
+
+        function overrideApiUrl() {
+            const newApiUrl = document.getElementById('override-api').value;
+            if (newApiUrl) {
+                window.AppConfig.override({ apiUrl: newApiUrl });
+                updateDisplay();
+                alert('API URL overridden to: ' + newApiUrl);
+            }
+        }
+
+
+        function resetConfig() {
+            // Recreate the config to reset overrides
+            window.AppConfig = new AppConfig();
+            updateDisplay();
+            alert('Configuration reset to defaults');
+        }
+
+        // Initialize display
+        document.addEventListener('DOMContentLoaded', () => {
+            updateDisplay();
+        });
+    </script>
+</body>
+</html>

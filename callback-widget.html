@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SSO Redirect</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 100px;
+      color: #333;
+    }
+    h2 {
+      margin-bottom: 20px;
+    }
+    .spinner {
+      margin: 20px auto;
+      width: 40px;
+      height: 40px;
+      border: 4px solid #ccc;
+      border-top: 4px solid #007BFF;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <script>
+
+    function parseUserString(userStr) {
+        // remove the "AuthResponse.UserInfo(" and trailing ")"
+        let clean = userStr.replace(/^AuthResponse\.UserInfo\(/, "").replace(/\)$/, "");
+        
+        // split by comma, but careful with roles list
+        let parts = clean.split(/,(?![^\[]*\])/); 
+
+        let obj = {};
+        parts.forEach(part => {
+                let [key, value] = part.split("=");
+                key = key.trim();
+                value = value.trim();
+
+                if (value === "true") value = true;
+                else if (value === "false") value = false;
+                else if (value.startsWith("[") && value.endsWith("]")) {
+                value = value.substring(1, value.length - 1).split(",").map(v => v.trim());
+                }
+
+                obj[key] = value;
+            });
+
+            return obj;
+    }
+
+
+    function parseQueryParams() {
+      const params = new URLSearchParams(window.location.search);
+      return Object.fromEntries(params.entries());
+    }
+
+    function storeTokens(tokenData) {
+      try {
+        localStorage.setItem('sso_access_token', tokenData.access_token);
+        localStorage.setItem('sso_refresh_token', tokenData.refresh_token);
+        localStorage.setItem('sso_token_expiry', Date.now() + (tokenData.expires_in * 1000));
+        localStorage.setItem('sso_token_type', tokenData.token_type || 'Bearer');
+        localStorage.setItem('sso_stored_at', Date.now().toString());
+        if (tokenData.user) {
+          localStorage.setItem('sso_user', JSON.stringify(tokenData.user));
+        }
+        sessionStorage.setItem('sso_token_backup', JSON.stringify(tokenData));
+        console.log('Tokens stored successfully');
+      } catch (err) {
+        console.error('Error storing tokens:', err);
+      }
+    }
+
+    (function init() {
+      const params = parseQueryParams();
+      // Handle error
+      if (params.error || params.error_description) {
+        console.error('SSO Error:', params.error, params.error_description);
+        window.location.href = '/sso-widget.html?error=' + encodeURIComponent(params.error || "sso_failed");
+        return;
+      }
+
+      // Handle successful auth
+      if (params.access_token && params.refresh_token) {
+        let userData = null;
+        try {
+          userData = params.user ? JSON.parse(decodeURIComponent(params.user)) : null;
+        } catch (e) {
+          console.error("Invalid user data received:", e);
+        }
+
+        const expirySeconds = Number(params.expires_in) || 3600;
+        const tokenData = {
+          access_token: params.access_token,
+          refresh_token: params.refresh_token,
+          token_type: params.token_type || 'Bearer',
+          expires_in: expirySeconds,
+          user: params.user ? parseUserString(params.user) : null
+        };
+
+        const userRoles = tokenData.user?.roles || [];
+        console.log('Auth successful, storing tokens...');
+        storeTokens(tokenData);
+
+        // Redirect based on roles
+        setTimeout(() => {
+          const adminRoles = ['ROLE_ADMIN', 'ROLE_DEAN', 'ROLE_DEPARTMENT_HEAD'];
+          const targetPage = userRoles.some(role => adminRoles.includes(role))
+            ? 'budget-dashboard.html'
+            : 'dashboard.html';
+          window.location.href = targetPage;
+        }, 500);
+      } else {
+        console.error('No auth data found');
+        window.location.href = '/sso-widget.html?error=missing_tokens';
+      }
+    })();
+  </script>
+</head>
+<body>
+  <h2>Processing authentication, please wait...</h2>
+  <div class="spinner"></div>
+</body>
+</html>
